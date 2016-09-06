@@ -101,11 +101,14 @@ def parse_dbevent(event):
     return iterable, schema
 
 
-def log_db_cmd(log, schema, cmd, args):
+def log_db_cmd(log, schema, cmd, args, kwargs):
     """ Log database command (when tap_db ini option is used). """
     s_args = '()'
     if len(args):
         s_args = '(*{0})'.format(len(args))
+    s_kwargs = '{}'
+    if len(kwargs):
+        s_kwargs = '{**{0}}'.format(len(kwargs))
     log.debug('{schema}/{cmd}{args}'.format(schema=schema,
                                             cmd=cmd,
                                             args=s_args))
@@ -140,7 +143,11 @@ class DBHandler(threading.Thread):
         """
         self.log = logging.getLogger(__name__)
         self.queue, self.event = queue, event
-        self.table, self.cmd, self.args = data
+        if len(data) == 4:
+            self.table, self.cmd, self.args, self.kwargs  = data
+        else:
+            self.table, self.cmd, self.args = data
+            self.kwargs = {}
 
         self.iterable, self.schema = parse_dbevent(event)
         self.filepath = get_db_filepath(self.schema)
@@ -156,18 +163,18 @@ class DBHandler(threading.Thread):
         dictdb = get_database(self.filepath, self.table)
         func = get_db_func(dictdb, self.cmd)
         if self._tap_db:
-            log_db_cmd(self.log, self.schema, self.cmd, self.args)
+            log_db_cmd(self.log, self.schema, self.cmd, self.args, self.kwargs)
 
         try:
             # single value result,
             if not self.iterable:
-                result = func(*self.args)
+                result = func(*self.args, **self.kwargs)
                 self.queue.send((self.event, result))
 
             # iterable value result,
             else:
                 self.queue.send((self.event, (None, 'StartIteration'),))
-                for item in func(*self.args):
+                for item in func(*self.args, **self.kwargs):
                     self.queue.send((self.event, item,))
                 self.queue.send((self.event, (None, StopIteration,),))
 

@@ -44,11 +44,11 @@ class DBProxy(object):
         from x84.bbs.session import getsession
         self._session = use_session and getsession()
 
-    def proxy_iter_session(self, method, *args):
+    def proxy_iter_session(self, method, *args, **kwargs):
         """ Proxy for iterable-return method calls over session IPC pipe. """
         event = 'db={0}'.format(self.schema)
         self._session.flush_event(event)
-        self._session.send_event(event, (self.table, method, args))
+        self._session.send_event(event, (self.table, method, args, kwargs))
         data = self._session.read_event(event)
         assert data == (None, 'StartIteration'), (
             'iterable proxy used on non-iterable, {0!r}'.format(data))
@@ -58,36 +58,36 @@ class DBProxy(object):
             data = self._session.read_event(event)
         self._session.flush_event(event)
 
-    def proxy_method_direct(self, method, *args):
+    def proxy_method_direct(self, method, *args, **kwargs):
         """ Proxy for direct dictionary method calls. """
         dictdb = get_database(filepath=get_db_filepath(self.schema),
                               table=self.table)
         try:
             func = get_db_func(dictdb, method)
             if self._tap_db:
-                log_db_cmd(self.log, self.schema, method, args)
-            return func(*args)
+                log_db_cmd(self.log, self.schema, method, args, kwargs)
+            return func(*args, **kwargs)
         finally:
             dictdb.close()
 
-    def proxy_iter(self, method, *args):
+    def proxy_iter(self, method, *args, **kwargs):
         """ Proxy for iterable dictionary method calls. """
         if self._session:
-            return self.proxy_iter_session(method, *args)
+            return self.proxy_iter_session(method, *args, **kwargs)
 
-        return self.proxy_method_direct(method, *args)
+        return self.proxy_method_direct(method, *args, **kwargs)
 
-    def proxy_method(self, method, *args):
+    def proxy_method(self, method, *args, **kwargs):
         """ Proxy for dictionary method calls. """
         if self._session:
-            return self.proxy_method_session(method, *args)
+            return self.proxy_method_session(method, *args, **kwargs)
 
-        return self.proxy_method_direct(method, *args)
+        return self.proxy_method_direct(method, *args, **kwargs)
 
-    def proxy_method_session(self, method, *args):
+    def proxy_method_session(self, method, *args, **kwargs):
         """ Proxy for dictionary method calls over IPC pipe. """
         event = 'db-{0}'.format(self.schema)
-        self._session.send_event(event, (self.table, method, args))
+        self._session.send_event(event, (self.table, method, args, kwargs))
         return self._session.read_event(event)
 
     def acquire(self):
@@ -151,28 +151,28 @@ class DBProxy(object):
         return self.proxy_method('__len__')
     __len__.__doc__ = dict.__len__.__doc__
 
-    def values(self):
-        return self.proxy_method('values')
+    def values(self, *args, **kwargs):
+        return self.proxy_method('values', *args, **kwargs)
     values.__doc__ = dict.values.__doc__
 
-    def items(self):
-        return self.proxy_method('items')
+    def items(self, *args, **kwargs):
+        return self.proxy_method('items', *args, **kwargs)
     items.__doc__ = dict.items.__doc__
 
-    def iteritems(self):
-        return self.proxy_iter('iteritems')
+    def iteritems(self, *args, **kwargs):
+        return self.proxy_iter('iteritems', *args, **kwargs)
     iteritems.__doc__ = dict.iteritems.__doc__
 
-    def iterkeys(self):
-        return self.proxy_iter('iterkeys')
+    def iterkeys(self, *args, **kwargs):
+        return self.proxy_iter('iterkeys', *args, **kwargs)
     iterkeys.__doc__ = dict.iterkeys.__doc__
 
-    def itervalues(self):
-        return self.proxy_iter('itervalues')
+    def itervalues(self, *args, **kwargs):
+        return self.proxy_iter('itervalues', *args, **kwargs)
     itervalues.__doc__ = dict.itervalues.__doc__
 
-    def keys(self):
-        return self.proxy_method('keys')
+    def keys(self, *args, **kwargs):
+        return self.proxy_method('keys', *args, **kwargs)
     keys.__doc__ = dict.keys.__doc__
 
     def pop(self):
